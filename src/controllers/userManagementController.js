@@ -1,0 +1,187 @@
+const bcrypt = require('bcryptjs');
+const Restaurant = require('../models/Restaurant');
+const TenantModelFactory = require('../models/TenantModelFactory');
+
+const getAllUsers = async (req, res) => {
+  try {
+    const restaurants = await Restaurant.find();
+    const allUsers = [];
+
+    for (const restaurant of restaurants) {
+      try {
+        const UserModel = TenantModelFactory.getUserModel(restaurant.slug);
+        const users = await UserModel.find().select('-password');
+        
+        users.forEach(user => {
+          allUsers.push({
+            ...user.toObject(),
+            restaurantName: restaurant.name,
+            restaurantSlug: restaurant.slug,
+            restaurantId: restaurant._id
+          });
+        });
+      } catch (error) {
+        console.error(`Error fetching users for ${restaurant.slug}:`, error);
+      }
+    }
+
+    res.json({ users: allUsers });
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+};
+
+const getRestaurantUsers = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const restaurant = await Restaurant.findById(restaurantId);
+    
+    if (!restaurant) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+
+    const UserModel = TenantModelFactory.getUserModel(restaurant.slug);
+    const users = await UserModel.find().select('-password');
+    
+    res.json({ users });
+  } catch (error) {
+    console.error('Get restaurant users error:', error);
+    res.status(500).json({ error: 'Failed to fetch restaurant users' });
+  }
+};
+
+const createUser = async (req, res) => {
+  try {
+    const { restaurantId, email, password, name, role, permissions, shift } = req.body;
+    
+    console.log('Creating user with restaurantId:', restaurantId);
+    
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (!restaurant) {
+      console.log('Restaurant not found for ID:', restaurantId);
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+
+    console.log('Found restaurant:', restaurant.name, restaurant.slug);
+
+    // Get dynamic user limit from settings
+    const Settings = require('../models/Settings');
+    const userLimitSetting = await Settings.findOne({ 
+      key: `PLAN_${restaurant.subscriptionPlan.toUpperCase()}_USERS` 
+    });
+    const userLimit = userLimitSetting?.value || (restaurant.subscriptionPlan === 'trial' ? 2 : 5);
+    
+    const UserModel = TenantModelFactory.getUserModel(restaurant.slug);
+    const currentUserCount = await UserModel.countDocuments();
+    
+    console.log('Current user count:', currentUserCount);
+    console.log('User limit:', userLimit);
+    console.log('Plan:', restaurant.subscriptionPlan);
+    
+    if (currentUserCount >= userLimit) {
+      console.log('User limit exceeded!');
+      return res.status(403).json({ 
+        error: `User limit exceeded. Your ${restaurant.subscriptionPlan} plan allows ${userLimit} users. Please upgrade your subscription.` 
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await UserModel.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    // Set default permissions based on role
+    const defaultPermissions = {
+      RESTAURANT_ADMIN: ['orders', 'menus', 'inventory', 'staff', 'reports', 'kitchen'],
+      MANAGER: ['orders', 'menus', 'inventory', 'reports'],
+      CHEF: ['orders', 'kitchen', 'inventory'],
+      WAITER: ['orders'],
+      CASHIER: ['orders']
+    };
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new UserModel({
+      email,
+      password: hashedPassword,
+      name,
+      role,
+      permissions: permissions || defaultPermissions[role] || [],
+      shift: shift || 'MORNING'
+    });
+
+    await user.save();
+    
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    
+    res.status(201).json({ 
+      message: 'User created successfully', 
+      user: userResponse 
+    });
+  } catch (error) {
+    console.error('Create user error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to create user: ' + error.message });
+  }
+};
+
+const updateUser = async (req, res) => {
+  try {
+    const { restaurantId, userId } = req.params;
+    const { name, role, isActive, permissions, shift } = req.body;
+    
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (!restaurant) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+
+    const UserModel = TenantModelFactory.getUserModel(restaurant.slug);
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      { name, role, isActive, permissions, shift },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'User updated successfully', user });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  try {
+    const { restaurantId, userId } = req.params;
+    
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (!restaurant) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+
+    const UserModel = TenantModelFactory.getUserModel(restaurant.slug);
+    const user = await UserModel.findByIdAndDelete(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+};
+
+module.exports = {
+  getAllUsers,
+  getRestaurantUsers,
+  createUser,
+  updateUser,
+  deleteUser
+};

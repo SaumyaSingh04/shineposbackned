@@ -1,0 +1,279 @@
+const mongoose = require('mongoose');
+
+// User Schema for tenant-specific collections
+const createUserSchema = () => new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true
+  },
+  password: {
+    type: String,
+    required: true
+  },
+  name: {
+    type: String,
+    required: true
+  },
+  role: {
+    type: String,
+    enum: ['RESTAURANT_ADMIN', 'MANAGER', 'CHEF', 'WAITER', 'CASHIER'],
+    required: true
+  },
+  permissions: [{
+    type: String,
+    enum: ['orders', 'menus', 'inventory', 'staff', 'reports', 'kitchen']
+  }],
+  phone: String,
+  shift: {
+    type: String,
+    enum: ['MORNING', 'AFTERNOON', 'EVENING', 'NIGHT'],
+    default: 'MORNING'
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Menu Schema for tenant-specific collections
+const createMenuSchema = () => new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  description: String,
+  price: {
+    type: Number,
+    required: true
+  },
+  category: {
+    type: String,
+    required: true
+  },
+  isAvailable: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Order Schema for tenant-specific collections
+const createOrderSchema = () => new mongoose.Schema({
+  orderNumber: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  items: [{
+    menuId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true
+    },
+    name: String,
+    price: Number,
+    quantity: Number
+  }],
+  totalAmount: {
+    type: Number,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['PENDING', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED', 'PAID'],
+    default: 'PENDING'
+  },
+  customerName: String,
+  customerPhone: String,
+  paymentDetails: {
+    method: String,
+    amount: Number,
+    transactionId: String,
+    paidAt: Date
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Inventory Schema for tenant-specific collections
+const createInventorySchema = () => new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  category: {
+    type: String,
+    required: true,
+    enum: ['ingredient', 'beverage', 'packaging', 'other']
+  },
+  currentStock: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  minStock: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  unit: {
+    type: String,
+    required: true,
+    enum: ['kg', 'g', 'l', 'ml', 'pieces', 'boxes']
+  },
+  costPerUnit: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  supplier: {
+    type: String,
+    trim: true
+  },
+  lastRestocked: {
+    type: Date,
+    default: Date.now
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  }
+}, {
+  timestamps: true
+});
+
+// Staff Schema for tenant-specific collections
+const createStaffSchema = () => new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true
+  },
+  password: {
+    type: String,
+    required: true
+  },
+  name: {
+    type: String,
+    required: true
+  },
+  role: {
+    type: String,
+    enum: ['RESTAURANT_ADMIN', 'MANAGER', 'CHEF', 'WAITER', 'CASHIER'],
+    required: true
+  },
+  permissions: [{
+    type: String,
+    enum: ['orders', 'menus', 'inventory', 'staff', 'reports', 'kitchen']
+  }],
+  phone: String,
+  hourlyRate: {
+    type: Number,
+    default: 0
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  shifts: [{
+    date: Date,
+    startTime: String,
+    endTime: String,
+    status: {
+      type: String,
+      enum: ['scheduled', 'completed', 'missed'],
+      default: 'scheduled'
+    }
+  }],
+  performance: {
+    ordersProcessed: { type: Number, default: 0 },
+    averageOrderTime: { type: Number, default: 0 },
+    customerRating: { type: Number, default: 0 }
+  }
+}, {
+  timestamps: true
+});
+
+class TenantModelFactory {
+  constructor() {
+    this.connections = new Map();
+    this.models = new Map();
+  }
+
+  getTenantConnection(restaurantSlug) {
+    if (!this.connections.has(restaurantSlug)) {
+      const dbName = `restaurant_${restaurantSlug}`;
+      const connection = mongoose.createConnection(process.env.MONGODB_URI.replace('/restaurant-saas', `/${dbName}`));
+      this.connections.set(restaurantSlug, connection);
+    }
+    return this.connections.get(restaurantSlug);
+  }
+
+  getUserModel(restaurantSlug) {
+    const modelKey = `${restaurantSlug}_users`;
+    if (!this.models.has(modelKey)) {
+      const connection = this.getTenantConnection(restaurantSlug);
+      this.models.set(modelKey, connection.model('users', createUserSchema()));
+    }
+    return this.models.get(modelKey);
+  }
+
+  getMenuModel(restaurantSlug) {
+    const modelKey = `${restaurantSlug}_menus`;
+    if (!this.models.has(modelKey)) {
+      const connection = this.getTenantConnection(restaurantSlug);
+      this.models.set(modelKey, connection.model('menus', createMenuSchema()));
+    }
+    return this.models.get(modelKey);
+  }
+
+  getOrderModel(restaurantSlug) {
+    const modelKey = `${restaurantSlug}_orders`;
+    if (!this.models.has(modelKey)) {
+      const connection = this.getTenantConnection(restaurantSlug);
+      this.models.set(modelKey, connection.model('orders', createOrderSchema()));
+    }
+    return this.models.get(modelKey);
+  }
+
+  getInventoryModel(restaurantSlug) {
+    const modelKey = `${restaurantSlug}_inventory`;
+    if (!this.models.has(modelKey)) {
+      const connection = this.getTenantConnection(restaurantSlug);
+      this.models.set(modelKey, connection.model('inventory', createInventorySchema()));
+    }
+    return this.models.get(modelKey);
+  }
+
+  getStaffModel(restaurantSlug) {
+    const modelKey = `${restaurantSlug}_staff`;
+    if (!this.models.has(modelKey)) {
+      const connection = this.getTenantConnection(restaurantSlug);
+      this.models.set(modelKey, connection.model('staff', createStaffSchema()));
+    }
+    return this.models.get(modelKey);
+  }
+
+  async createTenantDatabase(restaurantSlug) {
+    // Initialize models to create database and collections
+    this.getUserModel(restaurantSlug);
+    this.getMenuModel(restaurantSlug);
+    this.getOrderModel(restaurantSlug);
+    this.getInventoryModel(restaurantSlug);
+    this.getStaffModel(restaurantSlug);
+  }
+}
+
+module.exports = new TenantModelFactory();

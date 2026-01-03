@@ -1,0 +1,108 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
+const connectDB = require('./utils/database');
+
+// Import routes
+const authRoutes = require('./routes/auth');
+const restaurantRoutes = require('./routes/restaurants');
+const menuRoutes = require('./routes/menus');
+const orderRoutes = require('./routes/orders');
+const inventoryRoutes = require('./routes/inventory');
+const staffRoutes = require('./routes/staff');
+const kitchenRoutes = require('./routes/kitchen');
+const systemRoutes = require('./routes/system');
+const analyticsRoutes = require('./routes/analytics');
+const subscriptionRoutes = require('./routes/subscriptions');
+const settingsRoutes = require('./routes/settings');
+const communicationRoutes = require('./routes/communication');
+const userManagementRoutes = require('./routes/userManagement');
+const billingRoutes = require('./routes/billing');
+const paymentRoutes = require('./routes/payment');
+const { trackApiMetrics } = require('./controllers/systemController');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: ["http://localhost:3000", "http://localhost:5173"],
+    methods: ["GET", "POST"]
+  }
+});
+
+// Make io available to routes
+app.set('io', io);
+
+// Connect to MongoDB
+connectDB();
+
+// Initialize default settings
+const { initializeDefaultSettings } = require('./controllers/settingsController');
+initializeDefaultSettings();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(trackApiMetrics); // Track API metrics for monitoring
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  
+  // Join restaurant room
+  socket.on('join-restaurant', (restaurantSlug) => {
+    socket.join(restaurantSlug);
+    console.log(`Socket ${socket.id} joined restaurant: ${restaurantSlug}`);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/menus', menuRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/kitchen', kitchenRoutes);
+app.use('/api/system', systemRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/communication', communicationRoutes);
+app.use('/api/user-management', userManagementRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/payment', paymentRoutes);
+app.use('/api/:restaurantSlug/orders', (req, res, next) => {
+  console.log('Hit parameterized route with slug:', req.params.restaurantSlug);
+  next();
+}, orderRoutes);
+app.use('/api/orders', (req, res, next) => {
+  console.log('Hit regular orders route');
+  next();
+}, orderRoutes);
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Restaurant SaaS API is running' });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
