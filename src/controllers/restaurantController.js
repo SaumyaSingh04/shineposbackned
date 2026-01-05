@@ -20,6 +20,9 @@ const createRestaurant = async (req, res) => {
       return res.status(400).json({ error: 'Restaurant with this email already exists' });
     }
 
+    // Generate slug from restaurant name
+    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password || 'defaultPassword123', 10);
 
@@ -35,6 +38,7 @@ const createRestaurant = async (req, res) => {
     const restaurant = new Restaurant({ 
       name, 
       email, 
+      slug,
       phone,
       restaurantPhone,
       pinCode,
@@ -53,6 +57,7 @@ const createRestaurant = async (req, res) => {
         id: restaurant._id,
         name: restaurant.name,
         email: restaurant.email,
+        slug: restaurant.slug,
         phone: restaurant.phone,
         restaurantPhone: restaurant.restaurantPhone,
         pinCode: restaurant.pinCode,
