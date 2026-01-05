@@ -19,19 +19,19 @@ const createRestaurant = async (req, res) => {
       $or: [{ adminEmail }, { slug }] 
     });
     if (existingRestaurant) {
-      if (existingRestaurant.adminEmail === adminEmail) {
-        return res.status(400).json({ error: 'Restaurant with this email already exists' });
-      }
-      if (existingRestaurant.slug === slug) {
-        return res.status(400).json({ error: 'Restaurant slug already exists. Please choose a different slug.' });
-      }
+      const field = existingRestaurant.adminEmail === adminEmail ? 'email' : 'slug';
+      return res.status(400).json({ error: `Restaurant with this ${field} already exists` });
     }
+
+    // Hash admin password
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     // Create restaurant
     const restaurant = new Restaurant({ 
       name,
       slug: slug.toLowerCase().trim(),
       adminEmail, 
+      password: hashedPassword,
       adminName,
       phone,
       address,
@@ -44,19 +44,6 @@ const createRestaurant = async (req, res) => {
     });
     
     await restaurant.save();
-
-    // Create admin user for the restaurant
-    const UserModel = TenantModelFactory.getUserModel(restaurant.slug);
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    
-    const adminUser = new UserModel({
-      name: adminName,
-      email: adminEmail,
-      password: hashedPassword,
-      role: 'RESTAURANT_ADMIN'
-    });
-    
-    await adminUser.save();
 
     res.status(201).json({
       message: 'Restaurant registered successfully',
@@ -89,40 +76,42 @@ const getRestaurants = async (req, res) => {
 const getRestaurantAnalytics = async (req, res) => {
   try {
     const restaurants = await Restaurant.find();
-    const analytics = [];
-
-    for (const restaurant of restaurants) {
-      try {
-        const OrderModel = TenantModelFactory.getOrderModel(restaurant.slug);
-        const MenuModel = TenantModelFactory.getMenuModel(restaurant.slug);
-        
-        const totalOrders = await OrderModel.countDocuments();
-        const totalRevenue = await OrderModel.aggregate([
-          { $group: { _id: null, total: { $sum: '$total' } } }
-        ]);
-        const menuCount = await MenuModel.countDocuments();
-        
-        analytics.push({
-          restaurantId: restaurant._id,
-          name: restaurant.name,
-          slug: restaurant.slug,
-          isActive: restaurant.isActive,
-          totalOrders,
-          totalRevenue: totalRevenue[0]?.total || 0,
-          menuCount
-        });
-      } catch (err) {
-        analytics.push({
-          restaurantId: restaurant._id,
-          name: restaurant.name,
-          slug: restaurant.slug,
-          isActive: restaurant.isActive,
-          totalOrders: 0,
-          totalRevenue: 0,
-          menuCount: 0
-        });
-      }
-    }
+    const analytics = await Promise.all(
+      restaurants.map(async (restaurant) => {
+        try {
+          const [OrderModel, MenuModel] = [
+            TenantModelFactory.getOrderModel(restaurant.slug),
+            TenantModelFactory.getMenuModel(restaurant.slug)
+          ];
+          
+          const [totalOrders, totalRevenue, menuCount] = await Promise.all([
+            OrderModel.countDocuments(),
+            OrderModel.aggregate([{ $group: { _id: null, total: { $sum: '$total' } } }]),
+            MenuModel.countDocuments()
+          ]);
+          
+          return {
+            restaurantId: restaurant._id,
+            name: restaurant.name,
+            slug: restaurant.slug,
+            isActive: restaurant.isActive,
+            totalOrders,
+            totalRevenue: totalRevenue[0]?.total || 0,
+            menuCount
+          };
+        } catch {
+          return {
+            restaurantId: restaurant._id,
+            name: restaurant.name,
+            slug: restaurant.slug,
+            isActive: restaurant.isActive,
+            totalOrders: 0,
+            totalRevenue: 0,
+            menuCount: 0
+          };
+        }
+      })
+    );
 
     res.json({ analytics });
   } catch (error) {
@@ -136,26 +125,21 @@ const updateRestaurant = async (req, res) => {
     const { id } = req.params;
     const { name, slug } = req.body;
     
-    // Check if slug is being updated and if it already exists
+    const updateData = {};
+    if (name) updateData.name = name;
     if (slug) {
+      const slugValue = slug.toLowerCase().trim();
       const existingRestaurant = await Restaurant.findOne({ 
-        slug: slug.toLowerCase().trim(), 
+        slug: slugValue, 
         _id: { $ne: id } 
       });
       if (existingRestaurant) {
-        return res.status(400).json({ error: 'Restaurant slug already exists. Please choose a different slug.' });
+        return res.status(400).json({ error: 'Restaurant slug already exists' });
       }
+      updateData.slug = slugValue;
     }
     
-    const updateData = {};
-    if (name) updateData.name = name;
-    if (slug) updateData.slug = slug.toLowerCase().trim();
-    
-    const restaurant = await Restaurant.findByIdAndUpdate(
-      id, 
-      updateData, 
-      { new: true }
-    );
+    const restaurant = await Restaurant.findByIdAndUpdate(id, updateData, { new: true });
     
     if (!restaurant) {
       return res.status(404).json({ error: 'Restaurant not found' });
@@ -187,14 +171,15 @@ const deleteRestaurant = async (req, res) => {
 const toggleRestaurantStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const restaurant = await Restaurant.findById(id);
+    const restaurant = await Restaurant.findByIdAndUpdate(
+      id,
+      [{ $set: { isActive: { $not: '$isActive' } } }],
+      { new: true }
+    );
     
     if (!restaurant) {
       return res.status(404).json({ error: 'Restaurant not found' });
     }
-
-    restaurant.isActive = !restaurant.isActive;
-    await restaurant.save();
 
     res.json({
       message: `Restaurant ${restaurant.isActive ? 'enabled' : 'disabled'} successfully`,

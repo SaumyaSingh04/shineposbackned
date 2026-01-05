@@ -62,23 +62,27 @@ const login = async (req, res) => {
     let user, role, tokenPayload;
 
     if (restaurantSlug) {
-      // Restaurant user login
-      const restaurant = await Restaurant.findOne({ slug: restaurantSlug, isActive: true });
-      if (!restaurant) {
-        return res.status(400).json({ error: 'Restaurant not found or inactive' });
-      }
-
-      const UserModel = TenantModelFactory.getUserModel(restaurantSlug);
-      user = await UserModel.findOne({ email, isActive: true });
+      // Restaurant admin login - check Restaurant model directly
+      const restaurant = await Restaurant.findOne({ 
+        slug: restaurantSlug, 
+        adminEmail: email,
+        isActive: true 
+      });
       
-      if (!user || !await bcrypt.compare(password, user.password)) {
+      if (!restaurant || !await bcrypt.compare(password, restaurant.password)) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
       tokenPayload = {
-        userId: user._id,
-        role: user.role,
+        userId: restaurant._id,
+        role: 'RESTAURANT_ADMIN',
         restaurantSlug: restaurantSlug
+      };
+      
+      user = {
+        _id: restaurant._id,
+        email: restaurant.adminEmail,
+        name: restaurant.adminName
       };
     } else {
       // Try Super admin login first
