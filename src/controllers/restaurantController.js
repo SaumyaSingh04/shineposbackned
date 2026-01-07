@@ -46,6 +46,9 @@ const createRestaurant = async (req, res) => {
     
     await restaurant.save();
 
+    // Initialize tenant database and collections
+    await TenantModelFactory.createTenantDatabase(restaurant.slug);
+
     res.status(201).json({
       message: `Restaurant registered successfully with ${hasPaid ? '30-day subscription' : '14-day trial'}`,
       restaurant: {

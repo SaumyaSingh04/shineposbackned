@@ -20,6 +20,7 @@ const settingsRoutes = require('./routes/settings');
 const communicationRoutes = require('./routes/communication');
 const userManagementRoutes = require('./routes/userManagement');
 const paymentRoutes = require('./routes/payment');
+const categoryRoutes = require('./routes/category');
 const { trackApiMetrics } = require('./controllers/systemController');
 
 const app = express();
@@ -58,6 +59,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/communication', communicationRoutes);
 app.use('/api/user-management', userManagementRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use('/api/:restaurantSlug/orders', (req, res, next) => {
   console.log('Hit parameterized route with slug:', req.params.restaurantSlug);
   next();
