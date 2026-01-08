@@ -24,7 +24,7 @@ router.post('/add/restaurant',
 );
 
 // Get all restaurants (Super Admin only)
-router.get('/all/auth', auth(['SUPER_ADMIN']), getRestaurants);
+router.get('/all/restaurant', auth(['SUPER_ADMIN']), getRestaurants);
 
 // Get restaurant analytics (Super Admin only)
 router.get('/all/restaurant/analytics', auth(['SUPER_ADMIN']), getRestaurantAnalytics);
