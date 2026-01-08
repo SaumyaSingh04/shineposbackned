@@ -13,7 +13,7 @@ const router = express.Router();
 
 // Create Category
 router.post(
-    '/add/Category',
+    '/add/category',
     auth(['RESTAURANT_ADMIN']),
     tenantMiddleware,
     [
@@ -23,7 +23,7 @@ router.post(
 );
 
 // Get all categories
-router.get('/all/categories', auth(['RESTAURANT_ADMIN']), tenantMiddleware, getCategories);
+router.get('/all/category', auth(['RESTAURANT_ADMIN']), tenantMiddleware, getCategories);
 
 // Update category
 router.put('/update/category/:id', auth(['RESTAURANT_ADMIN']), tenantMiddleware, updateCategory);
