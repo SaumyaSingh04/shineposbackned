@@ -153,7 +153,47 @@ const createInventorySchema = () => new mongoose.Schema({
   timestamps: true
 });
 
-// Staff Schema for tenant-specific collections
+// Addon Schema for tenant-specific collections
+const createAddonSchema = () => new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  price: {
+    type: Number,
+    required: true
+  },
+  description: {
+    type: String
+  },
+  veg: {
+    type: Boolean,
+    default: true
+  },
+  available: {
+    type: Boolean,
+    default: true
+  }
+});
+
+// Variation Schema for tenant-specific collections
+const createVariationSchema = () => new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  price: {
+    type: Number,
+    required: true
+  },
+  available: {
+    type: Boolean,
+    default: true
+  }
+}, {
+  timestamps: true
+});
 const createStaffSchema = () => new mongoose.Schema({
   email: {
     type: String,
@@ -289,11 +329,49 @@ class TenantModelFactory {
     return this.models.get(modelKey);
   }
 
+  getMenuItemModel(restaurantSlug) {
+    const modelKey = `${restaurantSlug}_menuitems`;
+    if (!this.models.has(modelKey)) {
+      const connection = this.getTenantConnection(restaurantSlug);
+      const menuItemSchema = new mongoose.Schema({
+        itemName: { type: String, required: true, trim: true },
+        categoryID: { type: mongoose.Schema.Types.ObjectId, ref: 'categories', required: true },
+        status: { type: String, enum: ['active', 'inactive', 'out-of-stock'], default: 'active' },
+        imageUrl: { type: String, trim: true },
+        videoUrl: { type: String, trim: true },
+        timeToPrepare: { type: Number, required: true, min: 1 },
+        foodType: { type: String, enum: ['veg', 'nonveg'], required: true },
+        variation: [{ type: mongoose.Schema.Types.ObjectId, ref: 'variations' }],
+        addon: [{ type: mongoose.Schema.Types.ObjectId, ref: 'addons' }]
+      }, { timestamps: true });
+      this.models.set(modelKey, connection.model('menuitems', menuItemSchema));
+    }
+    return this.models.get(modelKey);
+  }
+
   getStaffModel(restaurantSlug) {
     const modelKey = `${restaurantSlug}_staff`;
     if (!this.models.has(modelKey)) {
       const connection = this.getTenantConnection(restaurantSlug);
       this.models.set(modelKey, connection.model('staff', createStaffSchema()));
+    }
+    return this.models.get(modelKey);
+  }
+
+  getAddonModel(restaurantSlug) {
+    const modelKey = `${restaurantSlug}_addons`;
+    if (!this.models.has(modelKey)) {
+      const connection = this.getTenantConnection(restaurantSlug);
+      this.models.set(modelKey, connection.model('addons', createAddonSchema()));
+    }
+    return this.models.get(modelKey);
+  }
+
+  getVariationModel(restaurantSlug) {
+    const modelKey = `${restaurantSlug}_variations`;
+    if (!this.models.has(modelKey)) {
+      const connection = this.getTenantConnection(restaurantSlug);
+      this.models.set(modelKey, connection.model('variations', createVariationSchema()));
     }
     return this.models.get(modelKey);
   }
@@ -305,6 +383,10 @@ class TenantModelFactory {
     this.getOrderModel(restaurantSlug);
     this.getInventoryModel(restaurantSlug);
     this.getStaffModel(restaurantSlug);
+    this.getCategoryModel(restaurantSlug);
+    this.getMenuItemModel(restaurantSlug);
+    this.getAddonModel(restaurantSlug);
+    this.getVariationModel(restaurantSlug);
   }
 }
 
