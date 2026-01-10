@@ -8,8 +8,6 @@ const connectDB = require('./utils/database');
 const authRoutes = require('./routes/auth');
 const restaurantRoutes = require('./routes/restaurants');
 const menuRoutes = require('./routes/menuItems');
-console.log('menuRoutes type:', typeof menuRoutes);
-console.log('menuRoutes:', menuRoutes);
 const orderRoutes = require('./routes/orders');
 const inventoryRoutes = require('./routes/inventory');
 const staffRoutes = require('./routes/staff');
