@@ -128,6 +128,7 @@ const updateKOTPriority = async (req, res) => {
     const { priority } = req.body;
     const restaurantSlug = req.user.restaurantSlug;
     const KOTModel = TenantModelFactory.getKOTModel(restaurantSlug);
+    const OrderModel = TenantModelFactory.getOrderModel(restaurantSlug);
     
     const kot = await KOTModel.findByIdAndUpdate(
       id,
@@ -137,6 +138,11 @@ const updateKOTPriority = async (req, res) => {
     
     if (!kot) {
       return res.status(404).json({ error: 'KOT not found' });
+    }
+    
+    // Sync priority with associated order
+    if (kot.orderId) {
+      await OrderModel.findByIdAndUpdate(kot.orderId, { priority });
     }
     
     res.json({

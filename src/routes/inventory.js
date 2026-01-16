@@ -5,7 +5,8 @@ const {
   getInventory, 
   updateInventoryItem, 
   restockItem, 
-  getLowStockItems 
+  getLowStockItems,
+  deleteInventoryItem
 } = require('../controllers/inventoryController');
 const auth = require('../middleware/auth');
 const tenantMiddleware = require('../middleware/tenant');
@@ -45,5 +46,8 @@ router.patch('/update/restock/:id',
   ],
   restockItem
 );
+
+// Delete inventory item
+router.delete('/delete/:id', auth(['RESTAURANT_ADMIN']), tenantMiddleware, deleteInventoryItem);
 
 module.exports = router;
