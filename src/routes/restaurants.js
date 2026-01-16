@@ -36,6 +36,6 @@ router.put('/update/:id', auth(['SUPER_ADMIN']), updateRestaurant);
 router.delete('/delete/:id', auth(['SUPER_ADMIN']), deleteRestaurant);
 
 // Toggle restaurant status (Super Admin only)
-router.patch('/:id/toggle-status', auth(['SUPER_ADMIN']), toggleRestaurantStatus);
+router.patch('/toggle-status/:id', auth(['SUPER_ADMIN']), toggleRestaurantStatus);
 
 module.exports = router;
