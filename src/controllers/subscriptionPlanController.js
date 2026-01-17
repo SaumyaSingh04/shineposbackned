@@ -113,7 +113,11 @@ const cancelSubscription = async (req, res) => {
       return res.status(404).json({ error: 'Restaurant not found' });
     }
 
-    restaurant.subscriptionEndDate = new Date();
+    const now = new Date();
+    const endDate = new Date(restaurant.subscriptionEndDate);
+    const timeRemaining = endDate - now;
+
+    restaurant.pausedTimeRemaining = timeRemaining > 0 ? timeRemaining : 0;
     restaurant.paymentStatus = 'cancelled';
     await restaurant.save();
 
@@ -142,14 +146,17 @@ const renewSubscription = async (req, res) => {
     }
 
     const now = new Date();
-    const currentEndDate = restaurant.subscriptionEndDate ? new Date(restaurant.subscriptionEndDate) : now;
+    let endDate;
     
-    // If subscription is still active, extend from current end date, otherwise start from now
-    const startDate = currentEndDate > now ? currentEndDate : now;
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + STANDARD_PLAN.duration);
+    if (restaurant.paymentStatus === 'cancelled' && restaurant.pausedTimeRemaining) {
+      endDate = new Date(now.getTime() + restaurant.pausedTimeRemaining);
+      restaurant.pausedTimeRemaining = null;
+    } else {
+      const currentEndDate = restaurant.subscriptionEndDate ? new Date(restaurant.subscriptionEndDate) : now;
+      endDate = currentEndDate > now ? new Date(currentEndDate.getTime() + STANDARD_PLAN.duration * 24 * 60 * 60 * 1000) : new Date(now.getTime() + STANDARD_PLAN.duration * 24 * 60 * 60 * 1000);
+    }
 
-    restaurant.subscriptionStartDate = now;
+    restaurant.subscriptionStartDate = restaurant.subscriptionStartDate || now;
     restaurant.subscriptionEndDate = endDate;
     restaurant.paymentStatus = 'paid';
     restaurant.paymentHistory.push({
@@ -167,7 +174,7 @@ const renewSubscription = async (req, res) => {
       message: 'Subscription renewed successfully',
       subscription: {
         plan: STANDARD_PLAN.name,
-        startDate: now,
+        startDate: restaurant.subscriptionStartDate,
         endDate
       }
     });

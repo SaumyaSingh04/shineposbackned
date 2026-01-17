@@ -38,11 +38,12 @@ const restaurantSchema = new mongoose.Schema({
   description: String,
   subscriptionPlan: {
     type: String,
-    enum: ['standard'],
-    default: 'standard'
+    enum: ['trial', 'subscription', 'cancelled', 'standard'],
+    default: 'trial'
   },
   subscriptionStartDate: Date,
   subscriptionEndDate: Date,
+  pausedTimeRemaining: Number,
   paymentStatus: {
     type: String,
     enum: ['pending', 'paid', 'failed', 'expired', 'cancelled'],
