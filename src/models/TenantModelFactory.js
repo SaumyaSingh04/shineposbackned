@@ -109,6 +109,11 @@ const createOrderSchema = () => new mongoose.Schema({
     enum: ['PENDING', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED', 'PAID'],
     default: 'PENDING'
   },
+  priority: {
+    type: String,
+    enum: ['LOW', 'NORMAL', 'HIGH', 'URGENT'],
+    default: 'NORMAL'
+  },
   customerName: String,
   customerPhone: String,
   paymentDetails: {
