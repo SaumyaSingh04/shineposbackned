@@ -5,7 +5,14 @@ const TenantModelFactory = require("../models/TenantModelFactory");
 const getTables = async (req, res) => {
   try {
     const TableModel = TenantModelFactory.getTableModel(req.user.restaurantSlug);
-    const tables = await TableModel.find({ isActive: true }).sort({ tableNumber: 1 });
+    const { status } = req.query;
+    
+    let filter = { isActive: true };
+    if (status) {
+      filter.status = status;
+    }
+    
+    const tables = await TableModel.find(filter).sort({ tableNumber: 1 });
     
     res.json({ tables });
   } catch (error) {
@@ -190,25 +197,6 @@ const updateBookingStatus = async (req, res) => {
   }
 };
 
-// Get available tables
-const getAvailableTables = async (req, res) => {
-  try {
-    const TableModel = TenantModelFactory.getTableModel(req.user.restaurantSlug);
-    const { partySize } = req.query;
-    
-    let filter = { isActive: true, status: "AVAILABLE" };
-    if (partySize) {
-      filter.capacity = { $gte: parseInt(partySize) };
-    }
-
-    const availableTables = await TableModel.find(filter);
-    res.json({ availableTables });
-  } catch (error) {
-    console.error("Get available tables error:", error);
-    res.status(500).json({ error: "Failed to fetch available tables" });
-  }
-};
-
 // Order food from table
 const orderFromTable = async (req, res) => {
   try {
@@ -356,7 +344,6 @@ module.exports = {
   getBookings,
   createBooking,
   updateBookingStatus,
-  getAvailableTables,
   orderFromTable,
   getMenuForTable,
 };

@@ -8,7 +8,6 @@ const {
   getBookings,
   createBooking,
   updateBookingStatus,
-  getAvailableTables,
   orderFromTable,
   getMenuForTable,
 } = require("../controllers/tableBookingController");
@@ -152,33 +151,6 @@ router.patch(
       .withMessage("Invalid booking status"),
   ],
   updateBookingStatus
-);
-
-// Get available tables
-router.get(
-  "/available-tables",
-  [
-    query("date")
-      .notEmpty()
-      .isISO8601()
-      .withMessage("Valid date is required"),
-
-    query("time")
-      .notEmpty()
-      .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
-      .withMessage("Valid time is required (HH:MM format)"),
-
-    query("partySize")
-      .optional()
-      .isInt({ min: 1 })
-      .withMessage("Party size must be at least 1"),
-
-    query("duration")
-      .optional()
-      .isInt({ min: 30, max: 480 })
-      .withMessage("Duration must be between 30 and 480 minutes"),
-  ],
-  getAvailableTables
 );
 
 // Get menu for table

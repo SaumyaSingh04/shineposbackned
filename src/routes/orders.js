@@ -6,6 +6,7 @@ const {
   createOrder,
   updateOrderStatus,
   updateOrderPriority,
+  processPayment,
 } = require("../controllers/orderController");
 const auth = require("../middleware/auth");
 const checkSubscription = require("../middleware/checkSubscription");
@@ -93,6 +94,20 @@ router.patch(
       .withMessage("Invalid priority"),
   ],
   updateOrderPriority,
+);
+
+/*=====================================================
+   PROCESS PAYMENT
+======================================================*/
+router.patch(
+  "/payment/:id",
+  activityLogger("Payment"),
+  [
+    param("id").isMongoId().withMessage("Invalid order ID"),
+    body("method").isIn(["CASH", "CARD", "UPI"]).withMessage("Invalid payment method"),
+    body("amount").isFloat({ min: 0 }).withMessage("Invalid amount"),
+  ],
+  processPayment,
 );
 
 module.exports = router;

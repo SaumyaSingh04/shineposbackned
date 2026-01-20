@@ -324,29 +324,32 @@ const processPayment = async (req, res) => {
       req.tenantModels?.Order ||
       TenantModelFactory.getOrderModel(req.user.restaurantSlug);
 
-    const existingOrder = await OrderModel.findById(id);
-    if (!existingOrder) {
+    const order = await OrderModel.findById(id);
+    if (!order) {
       return res.status(404).json({ error: "Order not found" });
     }
 
-    if (amount !== existingOrder.totalAmount) {
+    if (amount !== order.totalAmount) {
       return res
         .status(400)
         .json({ error: "Payment amount does not match order total" });
     }
 
-    const order = await OrderModel.findByIdAndUpdate(
-      id,
-      {
-        paymentDetails: {
-          method,
-          amount: existingOrder.totalAmount,
-          transactionId,
-          paidAt: new Date(),
-        },
-      },
-      { new: true }
-    );
+    order.status = 'PAID';
+    order.paymentDetails = {
+      method,
+      amount: order.totalAmount,
+      transactionId,
+      paidAt: new Date(),
+    };
+
+    await order.save();
+
+    // Update table status to available if order has a table
+    if (order.tableId) {
+      const TableModel = TenantModelFactory.getTableModel(req.user.restaurantSlug);
+      await TableModel.findByIdAndUpdate(order.tableId, { status: 'AVAILABLE' });
+    }
 
     res.json({
       message: "Payment processed successfully",

@@ -1,7 +1,9 @@
+const TenantModelFactory = require('../models/TenantModelFactory');
+
 const createTable = async (req, res) => {
     try {
         const { tableNumber, capacity, location, status } = req.body;
-        const Table = req.tenantModels.Table;
+        const Table = TenantModelFactory.getTableModel(req.user.restaurantSlug);
         
         const existingTable = await Table.findOne({ tableNumber });
         if (existingTable) {
@@ -20,7 +22,7 @@ const createTable = async (req, res) => {
 
 const getTables = async (req, res) => {
     try {
-        const Table = req.tenantModels.Table;
+        const Table = TenantModelFactory.getTableModel(req.user.restaurantSlug);
         const { status, location, isActive } = req.query;
         
         let filter = {};
@@ -39,7 +41,7 @@ const getTables = async (req, res) => {
 const getTableById = async (req, res) => {
     try {
         const { id } = req.params;
-        const Table = req.tenantModels.Table;
+        const Table = TenantModelFactory.getTableModel(req.user.restaurantSlug);
         
         const table = await Table.findById(id);
         if (!table) {
@@ -57,7 +59,7 @@ const updateTable = async (req, res) => {
     try {
         const { id } = req.params;
         const { tableNumber, capacity, location, status, isActive } = req.body;
-        const Table = req.tenantModels.Table;
+        const Table = TenantModelFactory.getTableModel(req.user.restaurantSlug);
         
         if (tableNumber) {
             const existingTable = await Table.findOne({ tableNumber, _id: { $ne: id } });
@@ -87,7 +89,7 @@ const updateTableStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
-        const Table = req.tenantModels.Table;
+        const Table = TenantModelFactory.getTableModel(req.user.restaurantSlug);
         
         const table = await Table.findByIdAndUpdate(
             id,
@@ -109,7 +111,7 @@ const updateTableStatus = async (req, res) => {
 const deleteTable = async (req, res) => {
     try {
         const { id } = req.params;
-        const Table = req.tenantModels.Table;
+        const Table = TenantModelFactory.getTableModel(req.user.restaurantSlug);
         
         const table = await Table.findByIdAndDelete(id);
         if (!table) {
@@ -125,7 +127,7 @@ const deleteTable = async (req, res) => {
 
 const getAvailableTables = async (req, res) => {
     try {
-        const Table = req.tenantModels.Table;
+        const Table = TenantModelFactory.getTableModel(req.user.restaurantSlug);
         const tables = await Table.find({ 
             status: 'AVAILABLE', 
             isActive: true 
@@ -138,6 +140,65 @@ const getAvailableTables = async (req, res) => {
     }
 };
 
+const transferTable = async (req, res) => {
+    try {
+        const { orderId, newTableId } = req.body;
+        const Table = TenantModelFactory.getTableModel(req.user.restaurantSlug);
+        const Order = TenantModelFactory.getOrderModel(req.user.restaurantSlug);
+        const KOT = TenantModelFactory.getKOTModel(req.user.restaurantSlug);
+        
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+        
+        const oldTableId = order.tableId;
+        if (!oldTableId) {
+            return res.status(400).json({ error: 'Order has no table assigned' });
+        }
+        
+        const oldTable = await Table.findById(oldTableId);
+        const newTable = await Table.findById(newTableId);
+        
+        if (!oldTable || !newTable) {
+            return res.status(404).json({ error: 'Table not found' });
+        }
+        
+        if (newTable.status !== 'AVAILABLE') {
+            return res.status(400).json({ error: 'New table is not available' });
+        }
+        
+        order.tableId = newTableId;
+        order.tableNumber = newTable.tableNumber;
+        await order.save();
+
+        await KOT.updateMany(
+            { orderId: orderId },
+            { 
+                tableId: newTableId,
+                tableNumber: newTable.tableNumber 
+            }
+        );
+
+        oldTable.status = 'MAINTENANCE';
+        await oldTable.save();
+
+        newTable.status = 'OCCUPIED';
+        await newTable.save();
+        
+        res.json({ 
+            message: 'Table transferred successfully',
+            order,
+            oldTable: { id: oldTable._id, number: oldTable.tableNumber, status: 'MAINTENANCE' },
+            newTable: { id: newTable._id, number: newTable.tableNumber, status: 'OCCUPIED' }
+        });
+    } catch (error) {
+        console.error('Transfer table error:', error);
+        res.status(500).json({ error: 'Failed to transfer table' });
+    }
+};
+
+
 module.exports = {
     createTable,
     getTables,
@@ -145,7 +206,8 @@ module.exports = {
     updateTable,
     updateTableStatus,
     deleteTable,
-    getAvailableTables
+    getAvailableTables,
+    transferTable
 };
 
 

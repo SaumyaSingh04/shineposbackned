@@ -10,7 +10,8 @@ const {
     updateTable,
     updateTableStatus,
     deleteTable,
-    getAvailableTables
+    getAvailableTables,
+    transferTable
 } = require('../controllers/tableController');
 
 const router = express.Router();
@@ -21,10 +22,17 @@ router.post('/add/table', auth(['RESTAURANT_ADMIN']), tenantMiddleware, activity
 ], createTable);
 
 router.get('/all/table', auth(['RESTAURANT_ADMIN', 'STAFF']), tenantMiddleware, activityLogger('Table'), getTables);
+router.get('/tables/available', auth(['RESTAURANT_ADMIN', 'STAFF', 'MANAGER', 'WAITER']), tenantMiddleware, activityLogger('Table'), getAvailableTables);
 router.get('/available/table', auth(['RESTAURANT_ADMIN', 'STAFF']), tenantMiddleware, activityLogger('Table'), getAvailableTables);
 router.get('/table/:id', auth(['RESTAURANT_ADMIN', 'STAFF']), tenantMiddleware, activityLogger('Table'), getTableById);
 router.put('/update/table/:id', auth(['RESTAURANT_ADMIN']), tenantMiddleware, activityLogger('Table'), updateTable);
 router.patch('/status/table/:id', auth(['RESTAURANT_ADMIN', 'STAFF']), tenantMiddleware, activityLogger('Table'), updateTableStatus);
 router.delete('/delete/table/:id', auth(['RESTAURANT_ADMIN']), tenantMiddleware, activityLogger('Table'), deleteTable);
+
+// Transfer table
+router.post('/transfer', auth(['RESTAURANT_ADMIN', 'MANAGER', 'WAITER']), tenantMiddleware, activityLogger('Table Transfer'), [
+    body('orderId').isMongoId().withMessage('Valid order ID is required'),
+    body('newTableId').isMongoId().withMessage('Valid new table ID is required')
+], transferTable);
 
 module.exports = router;
