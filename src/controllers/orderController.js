@@ -500,10 +500,14 @@ const processPayment = async (req, res) => {
 
     await order.save();
 
-    // Update table status to available if order has a table
+    // Update table status to maintenance if order has a table
     if (order.tableId) {
       const TableModel = TenantModelFactory.getTableModel(req.user.restaurantSlug);
-      await TableModel.findByIdAndUpdate(order.tableId, { status: 'AVAILABLE' });
+      const table = await TableModel.findById(order.tableId);
+      if (table) {
+        table.status = 'MAINTENANCE';
+        await table.save();
+      }
     }
 
     res.json({

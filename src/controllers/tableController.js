@@ -1,3 +1,4 @@
+const { validationResult } = require('express-validator');
 const TenantModelFactory = require('../models/TenantModelFactory');
 
 const createTable = async (req, res) => {
@@ -15,7 +16,6 @@ const createTable = async (req, res) => {
         
         res.status(201).json({ message: 'Table created successfully', table });
     } catch (error) {
-        console.error('Create table error:', error);
         res.status(500).json({ error: 'Failed to create table' });
     }
 };
@@ -33,7 +33,6 @@ const getTables = async (req, res) => {
         const tables = await Table.find(filter).sort({ tableNumber: 1 });
         res.json({ tables });
     } catch (error) {
-        console.error('Get tables error:', error);
         res.status(500).json({ error: 'Failed to fetch tables' });
     }
 };
@@ -50,7 +49,6 @@ const getTableById = async (req, res) => {
         
         res.json({ table });
     } catch (error) {
-        console.error('Get table error:', error);
         res.status(500).json({ error: 'Failed to fetch table' });
     }
 };
@@ -80,7 +78,6 @@ const updateTable = async (req, res) => {
         
         res.json({ message: 'Table updated successfully', table });
     } catch (error) {
-        console.error('Update table error:', error);
         res.status(500).json({ error: 'Failed to update table' });
     }
 };
@@ -91,19 +88,16 @@ const updateTableStatus = async (req, res) => {
         const { status } = req.body;
         const Table = TenantModelFactory.getTableModel(req.user.restaurantSlug);
         
-        const table = await Table.findByIdAndUpdate(
-            id,
-            { status },
-            { new: true }
-        );
-        
+        const table = await Table.findById(id);
         if (!table) {
             return res.status(404).json({ error: 'Table not found' });
         }
         
-        res.json({ message: 'Table status updated successfully', table });
+        table.status = status;
+        const savedTable = await table.save();
+        
+        res.json({ message: 'Table status updated successfully', table: savedTable });
     } catch (error) {
-        console.error('Update table status error:', error);
         res.status(500).json({ error: 'Failed to update table status' });
     }
 };
@@ -120,7 +114,6 @@ const deleteTable = async (req, res) => {
         
         res.json({ message: 'Table deleted successfully' });
     } catch (error) {
-        console.error('Delete table error:', error);
         res.status(500).json({ error: 'Failed to delete table' });
     }
 };
@@ -135,7 +128,6 @@ const getAvailableTables = async (req, res) => {
         
         res.json({ tables });
     } catch (error) {
-        console.error('Get available tables error:', error);
         res.status(500).json({ error: 'Failed to fetch available tables' });
     }
 };
@@ -193,11 +185,9 @@ const transferTable = async (req, res) => {
             newTable: { id: newTable._id, number: newTable.tableNumber, status: 'OCCUPIED' }
         });
     } catch (error) {
-        console.error('Transfer table error:', error);
         res.status(500).json({ error: 'Failed to transfer table' });
     }
 };
-
 
 module.exports = {
     createTable,

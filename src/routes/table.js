@@ -22,14 +22,19 @@ router.post('/add/table', auth(['RESTAURANT_ADMIN']), tenantMiddleware, activity
 ], createTable);
 
 router.get('/all/table', auth(['RESTAURANT_ADMIN', 'STAFF']), tenantMiddleware, activityLogger('Table'), getTables);
+router.get('/tables', auth(['RESTAURANT_ADMIN', 'STAFF', 'MANAGER', 'WAITER', 'CASHIER']), tenantMiddleware, activityLogger('Table'), getTables);
 router.get('/tables/available', auth(['RESTAURANT_ADMIN', 'STAFF', 'MANAGER', 'WAITER']), tenantMiddleware, activityLogger('Table'), getAvailableTables);
 router.get('/available/table', auth(['RESTAURANT_ADMIN', 'STAFF']), tenantMiddleware, activityLogger('Table'), getAvailableTables);
 router.get('/table/:id', auth(['RESTAURANT_ADMIN', 'STAFF']), tenantMiddleware, activityLogger('Table'), getTableById);
 router.put('/update/table/:id', auth(['RESTAURANT_ADMIN']), tenantMiddleware, activityLogger('Table'), updateTable);
-router.patch('/status/table/:id', auth(['RESTAURANT_ADMIN', 'STAFF']), tenantMiddleware, activityLogger('Table'), updateTableStatus);
+router.patch('/status/table/:id', auth(['RESTAURANT_ADMIN', 'STAFF']), tenantMiddleware, activityLogger('Table'), [
+    body('status').isIn(['AVAILABLE', 'OCCUPIED', 'RESERVED', 'MAINTENANCE']).withMessage('Invalid status')
+], updateTableStatus);
+router.patch('/tables/:id/status', auth(['RESTAURANT_ADMIN', 'STAFF', 'MANAGER', 'WAITER', 'CASHIER']), tenantMiddleware, activityLogger('Table'), [
+    body('status').isIn(['AVAILABLE', 'OCCUPIED', 'RESERVED', 'MAINTENANCE']).withMessage('Invalid status')
+], updateTableStatus);
 router.delete('/delete/table/:id', auth(['RESTAURANT_ADMIN']), tenantMiddleware, activityLogger('Table'), deleteTable);
 
-// Transfer table
 router.post('/transfer', auth(['RESTAURANT_ADMIN', 'MANAGER', 'WAITER']), tenantMiddleware, activityLogger('Table Transfer'), [
     body('orderId').isMongoId().withMessage('Valid order ID is required'),
     body('newTableId').isMongoId().withMessage('Valid new table ID is required')
