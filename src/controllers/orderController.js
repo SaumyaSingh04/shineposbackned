@@ -398,7 +398,10 @@ const getOrders = async (req, res) => {
       req.tenantModels?.Order ||
       TenantModelFactory.getOrderModel(req.user.restaurantSlug);
 
-    const orders = await OrderModel.find().sort({ createdAt: -1 });
+    const orders = await OrderModel.find()
+      .select('orderNumber items totalAmount customerName customerPhone tableId tableNumber mergedTables status priority createdAt paymentDetails')
+      .lean()
+      .sort({ createdAt: -1 });
 
     res.json({ orders });
   } catch (error) {
